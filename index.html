@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ECDIS Route Visualizer</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Google Fonts: Noto Sans -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            font-family: 'Noto Sans', sans-serif;
+        }
+        #map {
+            height: 100%;
+            width: 100%;
+            z-index: 1;
+        }
+        .drag-active {
+            border-color: #3b82f6;
+            background-color: #eff6ff;
+        }
+        /* Fix for Leaflet layer control z-index in Tailwind layout */
+        .leaflet-control-layers {
+            border: none !important;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1) !important;
+            border-radius: 0.5rem !important;
+            padding: 8px !important;
+            font-family: 'Noto Sans', sans-serif;
+            font-size: 0.875rem;
+        }
+        
+        /* Custom Waypoint Marker Style */
+        .wp-box-icon {
+            background: transparent;
+            border: none;
+        }
+        
+        .wp-marker-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        /* The solid dot */
+        .wp-dot {
+            width: 8px;
+            height: 8px;
+            background-color: #000; /* Solid Black */
+            border: 1px solid #fff; /* Tiny white border for contrast */
+            border-radius: 50%;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+            transition: transform 0.2s, background-color 0.2s;
+        }
+
+        /* The number next to the dot */
+        .wp-text {
+            position: absolute;
+            left: 10px; /* Offset to the right of the dot */
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 10px;
+            font-weight: 700;
+            color: #000;
+            white-space: nowrap;
+            /* White text shadow (halo) to ensure readability over map lines */
+            text-shadow: 
+                -1px -1px 0 #fff,  
+                 1px -1px 0 #fff,
+                -1px  1px 0 #fff,
+                 1px  1px 0 #fff;
+            pointer-events: none; /* Allow clicks to pass through text to map/marker if needed */
+        }
+
+        /* Hover effect */
+        .wp-marker-container:hover .wp-dot {
+            transform: scale(1.5);
+            background-color: #ef4444; /* Red on hover */
+            border-color: #fff;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-slate-800 text-white p-4 shadow-md flex justify-between items-center shrink-0 z-30">
+        <div class="flex items-center gap-3">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+            </svg>
+            <h1 class="text-xl font-bold tracking-wide">ECDIS Route Visualizer</h1>
+        </div>
+        <div class="text-sm text-slate-300 hidden sm:block">
+            Support: CSV (ECDIS Export)
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow flex flex-col lg:flex-row h-full overflow-hidden relative">
+        
+        <!-- Sidebar / Control Panel -->
+        <aside class="w-full lg:w-80 bg-white shadow-lg z-20 flex flex-col shrink-0 overflow-y-auto border-r border-slate-200">
+            
+            <!-- Upload Section -->
+            <div class="p-6 border-b border-slate-100">
+                <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-500" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                    </svg>
+                    Import Route
+                </h2>
+                
+                <div id="drop-zone" class="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center cursor-pointer transition-colors hover:border-blue-400 hover:bg-slate-50">
+                    <input type="file" id="file-input" accept=".csv" class="hidden" />
+                    <p class="text-slate-500 mb-2">Drag & Drop CSV file here</p>
+                    <button class="bg-blue-600 hover:bg-blue-700 text-white text-sm px-4 py-2 rounded-md transition-colors">
+                        Browse Files
+                    </button>
+                </div>
+                <p class="text-xs text-slate-400 mt-2">Compatible with standard WMR/ECDIS formats</p>
+            </div>
+
+            <!-- Stats Section -->
+            <div id="stats-panel" class="p-6 hidden">
+                <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">Route Information</h3>
+                
+                <div class="grid grid-cols-2 gap-4 mb-4">
+                    <div class="bg-slate-50 p-3 rounded border border-slate-100">
+                        <div class="text-xs text-slate-400">Total Waypoints</div>
+                        <div class="text-xl font-bold text-slate-700" id="wp-count">-</div>
+                    </div>
+                    <div class="bg-slate-50 p-3 rounded border border-slate-100">
+                        <div class="text-xs text-slate-400">Est. Distance</div>
+                        <div class="text-xl font-bold text-blue-600"><span id="total-dist">-</span> <span class="text-sm text-slate-500">NM</span></div>
+                    </div>
+                </div>
+
+                <div class="bg-yellow-50 border border-yellow-100 text-yellow-800 text-xs p-3 rounded">
+                    <strong>Note:</strong> Distance is estimated using Great Circle calculation. Do not use for navigation.
+                </div>
+            </div>
+
+            <!-- Waypoint List -->
+            <div id="wp-list-container" class="flex-1 overflow-y-auto hidden">
+                <div class="px-6 py-2 bg-slate-50 border-b border-t border-slate-200 text-xs font-semibold text-slate-500 sticky top-0">
+                    Waypoints
+                </div>
+                <ul id="wp-list" class="divide-y divide-slate-100">
+                    <!-- Dynamic Items -->
+                </ul>
+            </div>
+            
+            <!-- Initial Empty State -->
+            <div id="empty-state" class="flex-1 flex flex-col items-center justify-center p-6 text-slate-400 text-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mb-2 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0121 18.382V7.618a1 1 0 01-.806-.984A11.966 11.966 0 0015 7m0 13V7m0 0a11.966 11.966 0 013.478-.392m7.5 0v.01m-7.5 0a11.966 11.966 0 01-3.478-.392" />
+                </svg>
+                <p class="text-sm">No route data loaded.</p>
+            </div>
+
+        </aside>
+
+        <!-- Map Area -->
+        <div class="flex-1 relative bg-slate-200 h-full">
+            <div id="map" class="h-full w-full outline-none"></div>
+            
+            <!-- Loading Overlay -->
+            <div id="loading" class="absolute inset-0 bg-white/80 z-[1000] flex items-center justify-center hidden">
+                <div class="flex flex-col items-center">
+                    <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mb-3"></div>
+                    <span class="text-slate-600 font-medium">Parsing Waypoints...</span>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <script>
+        // --- 1. Map Initialization with Bathymetry Layers ---
+        
+        // Define Base Layers
+        const esriOcean = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}', {
+            attribution: 'Tiles &copy; Esri &mdash; Sources: GEBCO, NOAA, CHS, OSU, UNH, CSUMB, National Geographic, DeLorme, NAVTEQ, and Esri',
+            maxZoom: 13,
+            noWrap: false // Allow panning across the world
+        });
+
+        const esriOceanLabels = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Reference/MapServer/tile/{z}/{y}/{x}', {
+            attribution: '',
+            pane: 'shadowPane' 
+        });
+
+        const openStreetMap = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 20
+        });
+
+        // Overlay: OpenSeaMap (Contains Seamarks and some depth info)
+        const openSeaMap = L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png', {
+            attribution: 'Map data: &copy; <a href="http://www.openseamap.org">OpenSeaMap</a> contributors',
+            maxZoom: 18
+        });
+
+        // Initialize map
+        // We set worldCopyJump to true for user interaction comfort, 
+        // though our polyline logic handles the wrapping manually for rendering.
+        const map = L.map('map', {
+            center: [23.5, 121],
+            zoom: 5,
+            layers: [esriOcean, esriOceanLabels],
+            worldCopyJump: true 
+        });
+
+        // Layer Controls
+        const baseMaps = {
+            "Ocean / Bathymetry (Esri)": esriOcean,
+            "Street Map (Clean)": openStreetMap
+        };
+
+        const overlayMaps = {
+            "Ocean Labels": esriOceanLabels,
+            "Navigational Aids (OpenSeaMap)": openSeaMap
+        };
+
+        L.control.layers(baseMaps, overlayMaps, { position: 'topright' }).addTo(map);
+
+        let routeLayerGroup = L.layerGroup().addTo(map);
+
+        // --- 2. UI Handling ---
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const loading = document.getElementById('loading');
+        const statsPanel = document.getElementById('stats-panel');
+        const wpListContainer = document.getElementById('wp-list-container');
+        const wpList = document.getElementById('wp-list');
+        const emptyState = document.getElementById('empty-state');
+        const wpCountEl = document.getElementById('wp-count');
+        const totalDistEl = document.getElementById('total-dist');
+
+        // Drag & Drop Events
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.add('drag-active'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => dropZone.classList.remove('drag-active'), false);
+        });
+
+        dropZone.addEventListener('drop', handleDrop, false);
+        dropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', handleFiles);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            handleFiles({ target: { files: files } });
+        }
+
+        function handleFiles(e) {
+            const files = e.target.files;
+            if (files.length > 0) {
+                const file = files[0];
+                processCSV(file);
+            }
+        }
+
+        // --- 3. CSV Parsing Logic ---
+        function processCSV(file) {
+            loading.classList.remove('hidden');
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                try {
+                    const waypoints = parseWaypoints(text);
+                    if (waypoints.length === 0) {
+                        alert("No valid waypoints found.\nPlease check if the file matches standard ECDIS CSV export format.");
+                    } else {
+                        drawRoute(waypoints);
+                        updateStats(waypoints);
+                    }
+                } catch (err) {
+                    console.error(err);
+                    alert("Error parsing file: " + err.message);
+                } finally {
+                    loading.classList.add('hidden');
+                }
+            };
+            reader.readAsText(file); 
+        }
+
+        function parseCoordinate(coordStr) {
+            if (!coordStr) return null;
+            coordStr = coordStr.trim();
+            
+            // Regex for: Degrees (space) Minutes (space/optional) [NSEW]
+            const regex = /^(\d{1,3})\s+(\d{1,2}(?:\.\d+)?)\s+([NSEW])$/i;
+            const match = coordStr.match(regex);
+
+            if (match) {
+                let degrees = parseInt(match[1], 10);
+                let minutes = parseFloat(match[2]);
+                let cardinal = match[3].toUpperCase();
+
+                let decimal = degrees + (minutes / 60);
+
+                if (cardinal === 'S' || cardinal === 'W') {
+                    decimal = decimal * -1;
+                }
+                return decimal;
+            }
+            return null;
+        }
+
+        function parseWaypoints(csvText) {
+            const lines = csvText.split(/\r\n|\n/);
+            const waypoints = [];
+            
+            const latPattern = /(\d{1,2})\s+(\d{1,2}(?:\.\d+)?)\s+([NS])/;
+            const lonPattern = /(\d{1,3})\s+(\d{1,2}(?:\.\d+)?)\s+([EW])/;
+
+            lines.forEach((line, index) => {
+                if (!line.trim()) return;
+
+                const latMatch = line.match(latPattern);
+                const lonMatch = line.match(lonPattern);
+
+                if (latMatch && lonMatch) {
+                    const latStr = `${latMatch[1]} ${latMatch[2]} ${latMatch[3]}`;
+                    const lonStr = `${lonMatch[1]} ${lonMatch[2]} ${lonMatch[3]}`;
+
+                    const lat = parseCoordinate(latStr);
+                    const lon = parseCoordinate(lonStr);
+
+                    if (lat !== null && lon !== null) {
+                        if (Math.abs(lat) < 0.00001 && Math.abs(lon) < 0.00001) {
+                            return; 
+                        }
+
+                        const cols = line.split(',');
+                        let id = waypoints.length + 1;
+                        if (cols[0] && !isNaN(parseInt(cols[0]))) {
+                            id = cols[0];
+                        }
+
+                        waypoints.push({
+                            id: id,
+                            lat: lat,
+                            lon: lon,
+                            rawLat: latStr,
+                            rawLon: lonStr
+                        });
+                    }
+                }
+            });
+
+            return waypoints;
+        }
+
+        // --- 4. Drawing & Stats ---
+        function drawRoute(waypoints) {
+            routeLayerGroup.clearLayers();
+
+            if (waypoints.length === 0) return;
+
+            // --- Anti-Meridian Crossing Logic ---
+            const plottedPoints = [];
+            let previousLon = waypoints[0].lon;
+            let lonShift = 0;
+
+            waypoints.forEach(wp => {
+                const currentLon = wp.lon;
+                let diff = currentLon - previousLon;
+
+                if (diff > 180) {
+                    lonShift -= 360;
+                } else if (diff < -180) {
+                    lonShift += 360;
+                }
+
+                wp.plotLon = currentLon + lonShift;
+                plottedPoints.push([wp.lat, wp.plotLon]);
+                
+                previousLon = currentLon;
+            });
+
+            // Draw solid polyline
+            const polyline = L.polyline(plottedPoints, {
+                color: '#ef4444', // Red
+                weight: 3, 
+                opacity: 0.9, 
+                lineJoin: 'round'
+            }).addTo(routeLayerGroup);
+
+            // Draw Markers
+            waypoints.forEach((wp, idx) => {
+                const size = 10; // Visual size of the dot + border is about 10px (8+2)
+                
+                const icon = L.divIcon({
+                    className: 'wp-box-icon',
+                    html: `
+                        <div class="wp-marker-container">
+                            <div class="wp-dot"></div>
+                            <div class="wp-text">${wp.id}</div>
+                        </div>
+                    `,
+                    iconSize: [size, size],
+                    iconAnchor: [5, 5] // Anchor at center of the dot (approx)
+                });
+
+                L.marker([wp.lat, wp.plotLon], { icon: icon })
+                    .bindPopup(`
+                        <div class="font-sans">
+                            <strong class="block text-slate-800 mb-1">WP #${wp.id}</strong>
+                            <div class="text-xs text-slate-600">
+                                ${wp.rawLat}<br>
+                                ${wp.rawLon}
+                            </div>
+                        </div>
+                    `)
+                    .addTo(routeLayerGroup);
+            });
+
+            map.fitBounds(polyline.getBounds(), { padding: [50, 50] });
+        }
+
+        function updateStats(waypoints) {
+            emptyState.classList.add('hidden');
+            statsPanel.classList.remove('hidden');
+            wpListContainer.classList.remove('hidden');
+
+            wpCountEl.textContent = waypoints.length;
+
+            let totalDist = 0;
+            for (let i = 0; i < waypoints.length - 1; i++) {
+                const p1 = L.latLng(waypoints[i].lat, waypoints[i].lon);
+                const p2 = L.latLng(waypoints[i+1].lat, waypoints[i+1].lon);
+                totalDist += p1.distanceTo(p2); 
+            }
+            
+            const nm = (totalDist / 1852).toFixed(2);
+            totalDistEl.textContent = nm;
+
+            wpList.innerHTML = '';
+            waypoints.forEach((wp, idx) => {
+                const li = document.createElement('li');
+                li.className = 'px-6 py-3 hover:bg-slate-50 cursor-pointer transition-colors flex justify-between items-center group';
+                li.innerHTML = `
+                    <div>
+                        <span class="font-medium text-slate-700 text-sm">WP ${wp.id}</span>
+                        <div class="text-xs text-slate-400 font-mono mt-0.5">${wp.rawLat} / ${wp.rawLon}</div>
+                    </div>
+                    <button class="text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity" title="Locate on map">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                `;
+                
+                li.addEventListener('click', () => {
+                    map.flyTo([wp.lat, wp.plotLon], 11);
+                });
+                
+                wpList.appendChild(li);
+            });
+        }
+
+    </script>
+</body>
+</html>
