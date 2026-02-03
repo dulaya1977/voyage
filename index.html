@@ -219,7 +219,11 @@
             center: [23.5, 121],
             zoom: 5,
             layers: [esriOcean, esriOceanLabels],
-            worldCopyJump: true 
+            worldCopyJump: true,
+            // Add finer zoom control settings
+            zoomSnap: 0.1,    // Forces the map's zoom level to always be a multiple of this
+            zoomDelta: 0.25,  // Controls how much the zoom level changes after pressing +/-
+            wheelPxPerZoomLevel: 120 // Smoother wheel zooming
         });
 
         // Layer Controls
