@@ -249,7 +249,7 @@
               VoyVis is most useful after the ECDIS route draft is complete and before final Master approval, when the team needs to challenge waypoints, depth trends, UKC flags, dummy waypoints and suspicious route legs.
             </p>
             <div class="voyvis-actions">
-              <a class="button secondary" href="voyvis.html" target="_blank" rel="noopener noreferrer">
+              <a class="button secondary" href="#voyvis-tool" data-open-voyvis aria-expanded="false" aria-controls="voyvis-embed">
                 <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                   <path d="M14 3h7v7" />
                   <path d="M10 14 21 3" />
@@ -279,29 +279,16 @@
           </div>
         </div>
         <div class="section-inner">
-          <div class="voyvis-tool-shell is-collapsed reveal" id="voyvis-embed">
+          <div class="voyvis-tool-shell reveal" id="voyvis-embed">
             <div class="tool-window-bar" aria-hidden="true">
               <span></span>
               <span></span>
               <span></span>
             </div>
-            <button class="tool-collapsed-state" type="button" data-open-voyvis-panel>
-              <span class="tool-collapsed-icon" aria-hidden="true">
-                <svg viewBox="0 0 24 24" focusable="false">
-                  <path d="M9 18 3 21V6l6-3 6 3 6-3v15l-6 3-6-3Z" />
-                  <path d="M9 3v15" />
-                  <path d="M15 6v15" />
-                </svg>
-              </span>
-              <span>
-                <strong>Launch VoyVis inside this page</strong>
-                <small>Open the smart voyage visualizer below, then import CSV route data for review.</small>
-              </span>
-            </button>
             <iframe
               class="voyvis-frame"
               data-src="voyvis.html?embed=1"
-              src="about:blank"
+              src="voyvis.html?embed=1"
               title="Embedded VoyVis Smart Voyage Visualizer"
               loading="lazy"
             ></iframe>
