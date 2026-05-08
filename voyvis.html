@@ -17,10 +17,13 @@
 
     <style>
         body { font-family: 'Noto Sans', sans-serif; }
-        .embedded-voyvis body > header { display: none !important; }
         .embedded-voyvis body > main {
-            height: 100vh;
-            border-top: 3px solid #3b82f6;
+            flex: 1 1 auto;
+            height: auto !important;
+            min-height: 0;
+        }
+        .embedded-voyvis body > header {
+            border-bottom: 0 !important;
         }
         #map { height: 100%; width: 100%; z-index: 1; }
         .drag-active { border-color: #3b82f6; background-color: #eff6ff; }
