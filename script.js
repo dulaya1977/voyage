@@ -87,15 +87,22 @@ const voyvisIntroLinks = document.querySelectorAll("[data-voyvis-intro]");
 const voyvisShell = document.querySelector("#voyvis-embed");
 const voyvisFrame = document.querySelector(".voyvis-frame");
 
+function loadVoyVisFrame() {
+  if (!voyvisFrame) return;
+  const currentSrc = voyvisFrame.getAttribute("src") || "";
+
+  if (!currentSrc.includes("voyvis.html")) {
+    voyvisFrame.setAttribute("src", voyvisFrame.dataset.src || "voyvis.html?embed=1");
+  }
+}
+
 function setHeaderState() {
   header.classList.toggle("is-scrolled", window.scrollY > 24);
 }
 
 function openVoyVis(event) {
   if (event) event.preventDefault();
-  if (voyvisFrame && !voyvisFrame.getAttribute("src").includes("voyvis.html")) {
-    voyvisFrame.setAttribute("src", voyvisFrame.dataset.src || "voyvis.html");
-  }
+  loadVoyVisFrame();
   voyvisShell?.classList.remove("is-collapsed");
   document.body.classList.add("voyvis-active");
   document.querySelectorAll("[data-open-voyvis]").forEach((opener) => opener.setAttribute("aria-expanded", "true"));
@@ -105,15 +112,16 @@ function openVoyVis(event) {
 function resetToStart(event) {
   if (event) event.preventDefault();
   document.body.classList.remove("voyvis-active");
-  voyvisShell?.classList.add("is-collapsed");
+  voyvisShell?.classList.remove("is-collapsed");
   document.querySelectorAll("[data-open-voyvis]").forEach((opener) => opener.setAttribute("aria-expanded", "false"));
   document.querySelector("#top")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function showVoyVisIntro(event) {
   if (event) event.preventDefault();
+  loadVoyVisFrame();
   document.body.classList.remove("voyvis-active");
-  voyvisShell?.classList.add("is-collapsed");
+  voyvisShell?.classList.remove("is-collapsed");
   document.querySelectorAll("[data-open-voyvis]").forEach((opener) => opener.setAttribute("aria-expanded", "false"));
   document.querySelector("#voyvis-tool")?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
